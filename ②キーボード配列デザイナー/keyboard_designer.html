@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>キーボード配列デザイナー</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            transition: background 0.3s;
+        }
+
+        body.dark-mode {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+
+        header {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 1200px;
+            width: 100%;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        body.dark-mode .container {
+            background: #2a2a3e;
+            color: #e0e0e0;
+        }
+
+        .keyboard {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 20px auto;
+            max-width: 900px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .key {
+            background: linear-gradient(145deg, #f0f0f0, #ffffff);
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative;
+            user-select: none;
+            cursor: grab;
+        }
+
+        .key:active {
+            cursor: grabbing;
+        }
+
+        .key.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .key.drag-over {
+            border-color: #667eea;
+            background: linear-gradient(145deg, #e0e7ff, #f0f4ff);
+            transform: scale(1.05);
+        }
+
+        body.dark-mode .key.drag-over {
+            border-color: #667eea;
+            background: linear-gradient(145deg, #4a4a6e, #5a5a7e);
+        }
+
+        body.dark-mode .key {
+            background: linear-gradient(145deg, #3a3a4e, #4a4a5e);
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        .key:hover {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+
+        body.dark-mode .key:hover {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .key:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .key.active {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+            border-color: #5568d3;
+        }
+
+        body.dark-mode .key.active {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+            border-color: #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .key.space {
+            width: 300px;
+        }
+
+        .key.tab, .key.caps, .key.enter {
+            width: 75px;
+        }
+
+        .key.shift {
+            width: 100px;
+        }
+
+        .key.backspace {
+            width: 90px;
+        }
+
+        .controls {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+            color: #666;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        body.dark-mode .info {
+            background: #1a1a2e;
+            color: #aaa;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .settings-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 24px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 0;
+        }
+
+        .settings-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .help-btn {
+            position: fixed;
+            top: 20px;
+            right: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 24px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 0;
+        }
+
+        .help-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            min-width: 250px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s;
+            z-index: 999;
+        }
+
+        .settings-panel.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        body.dark-mode .settings-panel {
+            background: #2a2a3e;
+            color: #e0e0e0;
+        }
+
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        body.dark-mode .settings-item {
+            border-bottom-color: #444;
+        }
+
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+
+        .settings-label {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: #ccc;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(24px);
+        }
+
+        .record-btn {
+            background: linear-gradient(145deg, #f39c12, #e67e22);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .record-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+
+        .history-panel {
+            margin-top: 30px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        body.dark-mode .history-panel {
+            background: #1a1a2e;
+        }
+
+        .history-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        body.dark-mode .history-title {
+            color: #e0e0e0;
+        }
+
+        .history-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        body.dark-mode .history-item {
+            background: #2a2a3e;
+            color: #e0e0e0;
+        }
+
+        .history-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 10px;
+        }
+
+        .history-item-name {
+            font-weight: 700;
+            flex: 1;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .history-item-name:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .history-item-name-input {
+            font-weight: 700;
+            flex: 1;
+            padding: 4px 8px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        body.dark-mode .history-item-name-input {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            border-color: #667eea;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        body.dark-mode .modal-content {
+            background: #2a2a3e;
+            color: #e0e0e0;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        body.dark-mode .modal-title {
+            color: #e0e0e0;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .modal-input:focus {
+            border-color: #667eea;
+        }
+
+        body.dark-mode .modal-input {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            border-color: #555;
+        }
+
+        body.dark-mode .modal-input:focus {
+            border-color: #667eea;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-btn.cancel {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        body.dark-mode .modal-btn.cancel {
+            background: #3a3a4e;
+            color: #e0e0e0;
+        }
+
+        .modal-btn.confirm {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .help-panel {
+            position: fixed;
+            top: 80px;
+            right: 80px;
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 400px;
+            max-height: 70vh;
+            overflow-y: auto;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s;
+            z-index: 999;
+        }
+
+        .help-panel.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        body.dark-mode .help-panel {
+            background: #2a2a3e;
+            color: #e0e0e0;
+        }
+
+        .help-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        body.dark-mode .help-title {
+            color: #e0e0e0;
+        }
+
+        .help-section {
+            margin-bottom: 20px;
+        }
+
+        .help-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .help-section-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #666;
+        }
+
+        body.dark-mode .help-section-content {
+            color: #aaa;
+        }
+
+        .help-list {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .help-list li {
+            margin-bottom: 8px;
+        }
+
+        .help-kbd {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        body.dark-mode .help-kbd {
+            background: #3a3a4e;
+            border-color: #555;
+        }
+
+        .history-item-time {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .history-item-changes {
+            font-size: 14px;
+            color: #666;
+        }
+
+        body.dark-mode .history-item-changes {
+            color: #aaa;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .history-btn {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .history-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .history-btn.delete {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+        }
+    </style>
+</head>
+<body>
+    <button class="help-btn" id="helpBtn">?</button>
+    <button class="settings-btn" id="settingsBtn">⚙️</button>
+    
+    <div class="help-panel" id="helpPanel">
+        <div class="help-title">
+            <span>📖</span>
+            <span>使い方ガイド</span>
+        </div>
+        
+        <div class="help-section">
+            <div class="help-section-title">🎹 基本操作</div>
+            <div class="help-section-content">
+                <ul class="help-list">
+                    <li><strong>キーを選択：</strong>キーをクリックして選択状態にします</li>
+                    <li><strong>キーを変更：</strong>選択後、キーボードで文字を入力すると割り当てが変更されます</li>
+                    <li><strong>ドラッグ&ドロップ：</strong>キーを掴んで別のキーにドロップすると入れ替えができます</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-section-title">💾 保存と読み込み</div>
+            <div class="help-section-content">
+                <ul class="help-list">
+                    <li><strong>記録：</strong>現在の配列を履歴に保存します</li>
+                    <li><strong>AHKで保存：</strong>AutoHotkey v2形式のスクリプトとして出力します</li>
+                    <li><strong>JSONで保存：</strong>JSON形式で配列を保存します</li>
+                    <li><strong>配列を読込：</strong>保存したJSONファイルを読み込みます</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-section-title">📋 履歴機能</div>
+            <div class="help-section-content">
+                <ul class="help-list">
+                    <li><strong>名前変更：</strong>履歴の名前をクリックすると編集できます</li>
+                    <li><strong>読み込む：</strong>過去の配列を復元します</li>
+                    <li><strong>削除：</strong>不要な履歴を削除します</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-section-title">⚙️ 設定</div>
+            <div class="help-section-content">
+                <ul class="help-list">
+                    <li><strong>ダークモード：</strong>暗いテーマに切り替えます</li>
+                    <li><strong>特殊キーを編集：</strong>Enter、Escapeなどの特殊キーも編集可能にします</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-section-title">💡 ヒント</div>
+            <div class="help-section-content">
+                配列を変更したら「記録」ボタンで保存しておくと、いつでも元に戻せます。複数の配列を試したい場合に便利です！
+            </div>
+        </div>
+    </div>
+    
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-item">
+            <span class="settings-label">ダークモード</span>
+            <div class="toggle-switch" id="darkModeToggle">
+                <div class="toggle-slider"></div>
+            </div>
+        </div>
+        <div class="settings-item">
+            <span class="settings-label">特殊キーを編集</span>
+            <div class="toggle-switch" id="specialKeysToggle">
+                <div class="toggle-slider"></div>
+            </div>
+        </div>
+    </div>
+    
+    <header>
+        <h1>🎹 キーボード配列デザイナー</h1>
+        <p class="subtitle">独自のキーボード配列を作成しましょう</p>
+    </header>
+
+    <div class="container">
+        <div class="keyboard">
+            <div class="row">
+                <div class="key" data-key="Escape">Esc</div>
+                <div class="key" data-key="1">1</div>
+                <div class="key" data-key="2">2</div>
+                <div class="key" data-key="3">3</div>
+                <div class="key" data-key="4">4</div>
+                <div class="key" data-key="5">5</div>
+                <div class="key" data-key="6">6</div>
+                <div class="key" data-key="7">7</div>
+                <div class="key" data-key="8">8</div>
+                <div class="key" data-key="9">9</div>
+                <div class="key" data-key="0">0</div>
+                <div class="key" data-key="-">-</div>
+                <div class="key" data-key="^">^</div>
+                <div class="key backspace" data-key="Backspace">⌫</div>
+            </div>
+
+            <div class="row">
+                <div class="key tab" data-key="Tab">Tab</div>
+                <div class="key" data-key="Q">Q</div>
+                <div class="key" data-key="W">W</div>
+                <div class="key" data-key="E">E</div>
+                <div class="key" data-key="R">R</div>
+                <div class="key" data-key="T">T</div>
+                <div class="key" data-key="Y">Y</div>
+                <div class="key" data-key="U">U</div>
+                <div class="key" data-key="I">I</div>
+                <div class="key" data-key="O">O</div>
+                <div class="key" data-key="P">P</div>
+                <div class="key" data-key="[">[</div>
+                <div class="key" data-key="]">]</div>
+                <div class="key" data-key="\">\</div>
+            </div>
+
+            <div class="row">
+                <div class="key caps" data-key="CapsLock">Caps</div>
+                <div class="key" data-key="A">A</div>
+                <div class="key" data-key="S">S</div>
+                <div class="key" data-key="D">D</div>
+                <div class="key" data-key="F">F</div>
+                <div class="key" data-key="G">G</div>
+                <div class="key" data-key="H">H</div>
+                <div class="key" data-key="J">J</div>
+                <div class="key" data-key="K">K</div>
+                <div class="key" data-key="L">L</div>
+                <div class="key" data-key=";">;</div>
+                <div class="key" data-key="'">'</div>
+                <div class="key enter" data-key="Enter">Enter</div>
+            </div>
+
+            <div class="row">
+                <div class="key shift" data-key="ShiftLeft">Shift</div>
+                <div class="key" data-key="Z">Z</div>
+                <div class="key" data-key="X">X</div>
+                <div class="key" data-key="C">C</div>
+                <div class="key" data-key="V">V</div>
+                <div class="key" data-key="B">B</div>
+                <div class="key" data-key="N">N</div>
+                <div class="key" data-key="M">M</div>
+                <div class="key" data-key=",">,</div>
+                <div class="key" data-key=".">.</div>
+                <div class="key" data-key="/">/</div>
+                <div class="key shift" data-key="ShiftRight">Shift</div>
+            </div>
+
+            <div class="row">
+                <div class="key space" data-key="Space">Space</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="recordBtn" class="record-btn">📝 記録</button>
+            <button id="resetBtn">配列をリセット</button>
+            <button id="loadBtn">配列を読込</button>
+            <button id="saveJsonBtn">JSONで保存</button>
+            <button id="saveBtn">AHKで保存</button>
+        </div>
+
+        <div class="history-panel" id="historyPanel" style="display: none;">
+            <div class="history-title">📋 変更履歴</div>
+            <div id="historyList"></div>
+        </div>
+
+        <div class="info">
+            キーをクリックして選択し、配列をカスタマイズできます
+        </div>
+    </div>
+
+    <div class="modal" id="saveModal">
+        <div class="modal-content">
+            <div class="modal-title">ファイル名を入力</div>
+            <input type="text" class="modal-input" id="fileNameInput" placeholder="keyboard_layout">
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="modalCancel">キャンセル</button>
+                <button class="modal-btn confirm" id="modalConfirm">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const keys = document.querySelectorAll('.key');
+        let selectedKey = null;
+        let keyLayout = {};
+        let history = [];
+        let allowSpecialKeys = false;
+        let pendingSaveType = null; // 'ahk' or 'json'
+
+        // 設定パネルの表示/非表示
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsPanel.classList.toggle('show');
+            helpPanel.classList.remove('show');
+        });
+
+        // ヘルプパネルの表示/非表示
+        const helpBtn = document.getElementById('helpBtn');
+        const helpPanel = document.getElementById('helpPanel');
+        
+        helpBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            helpPanel.classList.toggle('show');
+            settingsPanel.classList.remove('show');
+        });
+
+        // パネル外をクリックで閉じる
+        document.addEventListener('click', (e) => {
+            if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+                settingsPanel.classList.remove('show');
+            }
+            if (!helpPanel.contains(e.target) && e.target !== helpBtn) {
+                helpPanel.classList.remove('show');
+            }
+        });
+
+        // ダークモード切り替え
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            darkModeToggle.classList.add('active');
+        }
+
+        darkModeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            darkModeToggle.classList.toggle('active');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        });
+
+        // 特殊キー編集の切り替え
+        const specialKeysToggle = document.getElementById('specialKeysToggle');
+        const savedSpecialKeys = localStorage.getItem('allowSpecialKeys') || 'false';
+        
+        if (savedSpecialKeys === 'true') {
+            allowSpecialKeys = true;
+            specialKeysToggle.classList.add('active');
+        }
+
+        specialKeysToggle.addEventListener('click', () => {
+            allowSpecialKeys = !allowSpecialKeys;
+            specialKeysToggle.classList.toggle('active');
+            localStorage.setItem('allowSpecialKeys', allowSpecialKeys.toString());
+            
+            // 選択中のキーをクリア
+            if (selectedKey) {
+                selectedKey.classList.remove('active');
+                selectedKey = null;
+            }
+        });
+
+        // 初期配列の保存
+        keys.forEach(key => {
+            const keyCode = key.dataset.key;
+            const keyText = key.textContent;
+            keyLayout[keyCode] = keyText;
+        });
+
+        // 記録ボタン
+        const recordBtn = document.getElementById('recordBtn');
+        const historyPanel = document.getElementById('historyPanel');
+        
+        recordBtn.addEventListener('click', () => {
+            // 記録ボタンを押した瞬間の状態を保存
+            saveToHistory();
+        });
+
+        // モーダル関連
+        const saveModal = document.getElementById('saveModal');
+        const fileNameInput = document.getElementById('fileNameInput');
+        const modalCancel = document.getElementById('modalCancel');
+        const modalConfirm = document.getElementById('modalConfirm');
+
+        function showSaveModal(type) {
+            pendingSaveType = type;
+            fileNameInput.value = 'keyboard_layout';
+            saveModal.classList.add('show');
+            fileNameInput.focus();
+            fileNameInput.select();
+        }
+
+        function hideSaveModal() {
+            saveModal.classList.remove('show');
+            pendingSaveType = null;
+        }
+
+        modalCancel.addEventListener('click', hideSaveModal);
+
+        modalConfirm.addEventListener('click', () => {
+            const fileName = fileNameInput.value.trim() || 'keyboard_layout';
+            if (pendingSaveType === 'ahk') {
+                saveAsAHK(fileName);
+            } else if (pendingSaveType === 'json') {
+                saveAsJSON(fileName);
+            }
+            hideSaveModal();
+        });
+
+        fileNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                modalConfirm.click();
+            } else if (e.key === 'Escape') {
+                hideSaveModal();
+            }
+        });
+
+        // モーダル外クリックで閉じる
+        saveModal.addEventListener('click', (e) => {
+            if (e.target === saveModal) {
+                hideSaveModal();
+            }
+        });
+
+        // 履歴に保存
+        function saveToHistory() {
+            const changes = [];
+            keys.forEach(key => {
+                const keyCode = key.dataset.key;
+                const defaultKey = getDefaultKey(keyCode);
+                const currentKey = key.textContent;
+                
+                // 実質的に変更されているか確認
+                // 特殊キーの表示名とキーコードが異なる場合を考慮
+                const isActuallyChanged = currentKey !== defaultKey && currentKey !== getDefaultDisplayName(keyCode);
+                
+                if (isActuallyChanged) {
+                    changes.push(`${keyCode} → ${currentKey}`);
+                }
+            });
+
+            if (changes.length === 0) {
+                alert('変更がありません');
+                return;
+            }
+
+            const historyItem = {
+                id: Date.now(),
+                name: `記録 #${history.length + 1}`,
+                timestamp: new Date().toLocaleString('ja-JP'),
+                layout: JSON.parse(JSON.stringify(keyLayout)),
+                changes: changes
+            };
+
+            history.unshift(historyItem);
+            updateHistoryDisplay();
+            historyPanel.style.display = 'block';
+        }
+
+        // デフォルトの表示名を取得（特殊キー用）
+        function getDefaultDisplayName(keyCode) {
+            const displayNames = {
+                'Escape': 'Esc',
+                'Backspace': '⌫',
+                'Tab': 'Tab',
+                'CapsLock': 'Caps',
+                'Enter': 'Enter',
+                'ShiftLeft': 'Shift',
+                'ShiftRight': 'Shift',
+                'Space': 'Space'
+            };
+            return displayNames[keyCode] || keyCode;
+        }
+
+        // 履歴表示を更新
+        function updateHistoryDisplay() {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '';
+
+            history.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'history-item';
+                itemDiv.innerHTML = `
+                    <div class="history-item-header">
+                        <span class="history-item-name" onclick="renameHistory(${item.id})">${item.name}</span>
+                        <span class="history-item-time">${item.timestamp}</span>
+                    </div>
+                    <div class="history-item-changes">${item.changes.join(', ')}</div>
+                    <div class="history-actions">
+                        <button class="history-btn" onclick="loadHistory(${item.id})">読み込む</button>
+                        <button class="history-btn delete" onclick="deleteHistory(${item.id})">削除</button>
+                    </div>
+                `;
+                historyList.appendChild(itemDiv);
+            });
+        }
+
+        // 履歴の名前を変更
+        window.renameHistory = function(id) {
+            const item = history.find(h => h.id === id);
+            if (!item) return;
+
+            const historyList = document.getElementById('historyList');
+            const itemDiv = Array.from(historyList.children).find(div => {
+                return div.querySelector('.history-item-name')?.textContent === item.name;
+            });
+
+            if (!itemDiv) return;
+
+            const nameSpan = itemDiv.querySelector('.history-item-name');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'history-item-name-input';
+            input.value = item.name;
+            
+            nameSpan.replaceWith(input);
+            input.focus();
+            input.select();
+
+            const finishRename = () => {
+                const newName = input.value.trim() || item.name;
+                item.name = newName;
+                updateHistoryDisplay();
+            };
+
+            input.addEventListener('blur', finishRename);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    finishRename();
+                } else if (e.key === 'Escape') {
+                    updateHistoryDisplay();
+                }
+            });
+        };
+
+        // 履歴を読み込む
+        window.loadHistory = function(id) {
+            const item = history.find(h => h.id === id);
+            if (item) {
+                keyLayout = JSON.parse(JSON.stringify(item.layout));
+                keys.forEach(key => {
+                    const keyCode = key.dataset.key;
+                    if (keyLayout[keyCode]) {
+                        key.textContent = keyLayout[keyCode];
+                    }
+                });
+            }
+        };
+
+        // 履歴を削除
+        window.deleteHistory = function(id) {
+            history = history.filter(h => h.id !== id);
+            updateHistoryDisplay();
+            if (history.length === 0) {
+                historyPanel.style.display = 'none';
+            }
+        };
+
+        // キーのクリックイベント
+        keys.forEach(key => {
+            key.addEventListener('click', () => {
+                const keyCode = key.dataset.key;
+                const isSpecialKey = ['Escape', 'Tab', 'CapsLock', 'Enter', 'Backspace', 'ShiftLeft', 'ShiftRight', 'Space'].includes(keyCode);
+                
+                // 特殊キーで、編集が許可されていない場合はスキップ
+                if (isSpecialKey && !allowSpecialKeys) {
+                    return;
+                }
+                
+                if (selectedKey) {
+                    selectedKey.classList.remove('active');
+                }
+                key.classList.add('active');
+                selectedKey = key;
+            });
+
+            // ドラッグ&ドロップイベント
+            key.setAttribute('draggable', 'true');
+
+            key.addEventListener('dragstart', (e) => {
+                const keyCode = key.dataset.key;
+                const isSpecialKey = ['Escape', 'Tab', 'CapsLock', 'Enter', 'Backspace', 'ShiftLeft', 'ShiftRight', 'Space'].includes(keyCode);
+                
+                // 特殊キーで、編集が許可されていない場合はドラッグ不可
+                if (isSpecialKey && !allowSpecialKeys) {
+                    e.preventDefault();
+                    return;
+                }
+
+                key.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', key.dataset.key);
+            });
+
+            key.addEventListener('dragend', () => {
+                key.classList.remove('dragging');
+            });
+
+            key.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const keyCode = key.dataset.key;
+                const isSpecialKey = ['Escape', 'Tab', 'CapsLock', 'Enter', 'Backspace', 'ShiftLeft', 'ShiftRight', 'Space'].includes(keyCode);
+                
+                // 特殊キーで、編集が許可されていない場合はドロップ不可
+                if (isSpecialKey && !allowSpecialKeys) {
+                    return;
+                }
+
+                e.dataTransfer.dropEffect = 'move';
+                key.classList.add('drag-over');
+            });
+
+            key.addEventListener('dragleave', () => {
+                key.classList.remove('drag-over');
+            });
+
+            key.addEventListener('drop', (e) => {
+                e.preventDefault();
+                key.classList.remove('drag-over');
+
+                const targetKeyCode = key.dataset.key;
+                const isTargetSpecial = ['Escape', 'Tab', 'CapsLock', 'Enter', 'Backspace', 'ShiftLeft', 'ShiftRight', 'Space'].includes(targetKeyCode);
+                
+                // 特殊キーで、編集が許可されていない場合はドロップ不可
+                if (isTargetSpecial && !allowSpecialKeys) {
+                    return;
+                }
+
+                const sourceKeyCode = e.dataTransfer.getData('text/plain');
+                const sourceKey = Array.from(keys).find(k => k.dataset.key === sourceKeyCode);
+
+                if (sourceKey && sourceKey !== key) {
+                    // キーの内容を入れ替え
+                    const tempText = key.textContent;
+                    const tempLayout = keyLayout[targetKeyCode];
+
+                    key.textContent = sourceKey.textContent;
+                    keyLayout[targetKeyCode] = keyLayout[sourceKeyCode];
+
+                    sourceKey.textContent = tempText;
+                    keyLayout[sourceKeyCode] = tempLayout;
+                }
+            });
+        });
+
+        // キーボード入力イベント
+        document.addEventListener('keydown', (e) => {
+            if (selectedKey && e.key.length === 1) {
+                const keyCode = selectedKey.dataset.key;
+                const isSpecialKey = ['Escape', 'Tab', 'CapsLock', 'Enter', 'Backspace', 'ShiftLeft', 'ShiftRight', 'Space'].includes(keyCode);
+                
+                // 特殊キーで、編集が許可されていない場合はスキップ
+                if (isSpecialKey && !allowSpecialKeys) {
+                    return;
+                }
+                
+                selectedKey.textContent = e.key.toUpperCase();
+                keyLayout[selectedKey.dataset.key] = e.key.toUpperCase();
+                e.preventDefault();
+            }
+        });
+
+        // リセットボタン
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            keys.forEach(key => {
+                const keyCode = key.dataset.key;
+                if (keyCode === 'Escape') key.textContent = 'Esc';
+                else if (keyCode === 'Backspace') key.textContent = '⌫';
+                else if (keyCode === 'Tab') key.textContent = 'Tab';
+                else if (keyCode === 'CapsLock') key.textContent = 'Caps';
+                else if (keyCode === 'Enter') key.textContent = 'Enter';
+                else if (keyCode === 'ShiftLeft' || keyCode === 'ShiftRight') key.textContent = 'Shift';
+                else if (keyCode === 'Space') key.textContent = 'Space';
+                else if (keyCode === '^') key.textContent = '^';
+                else key.textContent = keyCode;
+                
+                keyLayout[keyCode] = key.textContent;
+            });
+            if (selectedKey) {
+                selectedKey.classList.remove('active');
+                selectedKey = null;
+            }
+        });
+
+        // 保存ボタン（AHK形式）
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            showSaveModal('ahk');
+        });
+
+        function saveAsAHK(fileName) {
+            let ahkScript = '; キーボード配列スクリプト\r\n';
+            ahkScript += '; AutoHotkey v2.0+\r\n\r\n';
+            
+            keys.forEach(key => {
+                const keyCode = key.dataset.key;
+                const keyText = key.textContent;
+                
+                // 特殊キーの処理
+                const isSpecialKey = ['Escape', 'Tab', 'CapsLock', 'Enter', 'Backspace', 'ShiftLeft', 'ShiftRight', 'Space'].includes(keyCode);
+                
+                // 特殊キー編集が無効の場合はスキップ
+                if (isSpecialKey && !allowSpecialKeys) {
+                    return;
+                }
+                
+                // デフォルトから変更されたキーのみ出力
+                const defaultKey = getDefaultKey(keyCode);
+                if (keyText !== defaultKey && keyText.length === 1) {
+                    const ahkKeyCode = convertToAHKKey(keyCode);
+                    const ahkKeyText = keyText.toLowerCase();
+                    ahkScript += `${ahkKeyCode}::Send "${ahkKeyText}"\r\n`;
+                }
+            });
+            
+            if (ahkScript.split('\r\n').length <= 3) {
+                alert('キー配列が変更されていません。キーをクリックして選択し、新しい文字を入力してください。');
+                return;
+            }
+            
+            const blob = new Blob([ahkScript], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fileName}.ahk`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // JSON保存ボタン
+        document.getElementById('saveJsonBtn').addEventListener('click', () => {
+            showSaveModal('json');
+        });
+
+        function saveAsJSON(fileName) {
+            const json = JSON.stringify(keyLayout, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fileName}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // デフォルトキーを取得
+        function getDefaultKey(keyCode) {
+            const defaults = {
+                '1': '1', '2': '2', '3': '3', '4': '4', '5': '5',
+                '6': '6', '7': '7', '8': '8', '9': '9', '0': '0',
+                '-': '-', '^': '^',
+                'Q': 'Q', 'W': 'W', 'E': 'E', 'R': 'R', 'T': 'T',
+                'Y': 'Y', 'U': 'U', 'I': 'I', 'O': 'O', 'P': 'P',
+                '[': '[', ']': ']', '\\': '\\',
+                'A': 'A', 'S': 'S', 'D': 'D', 'F': 'F', 'G': 'G',
+                'H': 'H', 'J': 'J', 'K': 'K', 'L': 'L', ';': ';', '\'': '\'',
+                'Z': 'Z', 'X': 'X', 'C': 'C', 'V': 'V', 'B': 'B',
+                'N': 'N', 'M': 'M', ',': ',', '.': '.', '/': '/'
+            };
+            return defaults[keyCode] || keyCode;
+        }
+
+        // AHKキーコードに変換
+        function convertToAHKKey(keyCode) {
+            const keyMap = {
+                '1': '1', '2': '2', '3': '3', '4': '4', '5': '5',
+                '6': '6', '7': '7', '8': '8', '9': '9', '0': '0',
+                '-': '-', '^': '^',
+                'Q': 'q', 'W': 'w', 'E': 'e', 'R': 'r', 'T': 't',
+                'Y': 'y', 'U': 'u', 'I': 'i', 'O': 'o', 'P': 'p',
+                '[': '[', ']': ']', '\\': '\\',
+                'A': 'a', 'S': 's', 'D': 'd', 'F': 'f', 'G': 'g',
+                'H': 'h', 'J': 'j', 'K': 'k', 'L': 'l', ';': ';', '\'': '\'',
+                'Z': 'z', 'X': 'x', 'C': 'c', 'V': 'v', 'B': 'b',
+                'N': 'n', 'M': 'm', ',': ',', '.': '.', '/': '/'
+            };
+            return keyMap[keyCode] || keyCode.toLowerCase();
+        }
+
+        // 読込ボタン
+        document.getElementById('loadBtn').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const loaded = JSON.parse(event.target.result);
+                        keyLayout = loaded;
+                        keys.forEach(key => {
+                            const keyCode = key.dataset.key;
+                            if (loaded[keyCode]) {
+                                key.textContent = loaded[keyCode];
+                            }
+                        });
+                    } catch (err) {
+                        alert('ファイルの読み込みに失敗しました');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        });
+    </script>
+</body>
+</html>
