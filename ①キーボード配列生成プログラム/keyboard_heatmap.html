@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="UTF-8">
+	<title>キーボード比較ヒートマップ</title>
+	<style>
+		body {
+			font-family: sans-serif;
+			background: #fafafa;
+			padding: 20px;
+			text-align: center;
+		}
+		textarea {
+			width: 90%;
+			height: 100px;
+			font-size: 16px;
+			margin-bottom: 10px;
+		}
+		button, input[type=file] {
+			margin: 5px;
+			padding: 6px 12px;
+			font-size: 14px;
+			border: none;
+			border-radius: 6px;
+			background: #2196f3;
+			color: white;
+			cursor: pointer;
+		}
+		button:hover {
+			background: #1976d2;
+		}
+		.container {
+			display: flex;
+			justify-content: center;
+			flex-wrap: wrap;
+			gap: 40px;
+		}
+		.keyboard {
+			display: inline-block;
+			text-align: center;
+		}
+		.key-row {
+			display: flex;
+			justify-content: center;
+			margin: 4px 0;
+		}
+		.key {
+			width: 40px;
+			height: 40px;
+			margin: 3px;
+			text-align: center;
+			line-height: 40px;
+			border-radius: 6px;
+			border: 1px solid #ccc;
+			font-weight: bold;
+			background: #eee;
+			transition: background 0.3s;
+		}
+		h3 {
+			margin-top: 5px;
+			font-size: 18px;
+		}
+		#info {
+			margin-top: 10px;
+			font-size: 14px;
+			color: #555;
+		}
+	</style>
+</head>
+<body>
+	<h2>キーボード比較ヒートマップ（QWERTY vs 独自配列）</h2>
+	<textarea id="inputText" placeholder="ここに文字列を入力"></textarea><br>
+	<input type="file" id="fileInput" accept=".json">
+	<button id="analyze">更新</button>
+	<div class="container">
+		<div class="keyboard" id="qwerty">
+			<h3>QWERTY</h3>
+			<div id="qwerty-keys"></div>
+		</div>
+		<div class="keyboard" id="custom">
+			<h3>独自配列</h3>
+			<div id="custom-keys"></div>
+		</div>
+	</div>
+	<div id="info"></div>
+
+	<script>
+		const qwertyRows = [
+			['1','2','3','4','5','6','7','8','9','0','-','=','^','\\'],
+			['Q','W','E','R','T','Y','U','I','O','P','@','['],
+			['A','S','D','F','G','H','J','K','L',';',':',']'],
+			['Z','X','C','V','B','N','M',',','.','/','_']
+		];
+		
+		// キーボードに存在する全キーのセットを作成
+		const validKeys = new Set();
+		qwertyRows.forEach(row => {
+			row.forEach(key => {
+				validKeys.add(key.toUpperCase());
+				validKeys.add(key.toLowerCase());
+			});
+		});
+		
+		let customMap = null;
+		let customValidKeys = new Set();
+
+		function createKeyboardLayout(rows, targetId) {
+			const keyboardDiv = document.getElementById(targetId);
+			keyboardDiv.innerHTML = "";
+			rows.forEach(row => {
+				const div = document.createElement("div");
+				div.className = "key-row";
+				row.forEach(k => {
+					const key = document.createElement("div");
+					key.className = "key";
+					key.textContent = k;
+					key.dataset.key = k;
+					div.appendChild(key);
+				});
+				keyboardDiv.appendChild(div);
+			});
+		}
+
+		function countFrequency(text, isCustom = false) {
+			const counts = {};
+			const validSet = isCustom ? customValidKeys : validKeys;
+			let ignoredCount = 0;
+			
+			for (const ch of text) {
+				const upper = ch.toUpperCase();
+				// キーボードに存在するキーのみカウント
+				if (validSet.has(upper) || validSet.has(ch)) {
+					counts[upper] = (counts[upper] || 0) + 1;
+				} else {
+					ignoredCount++;
+				}
+			}
+			return { counts, ignoredCount };
+		}
+
+		function applyHeatmap(targetId, counts, isCustom=false) {
+			const total = Object.values(counts).reduce((a,b)=>a+b,0);
+			const max = Math.max(...Object.values(counts), 1);
+			document.querySelectorAll(`#${targetId} .key`).forEach(el => {
+				let displayKey = el.dataset.key;
+				let countKey = displayKey.toUpperCase();
+				
+				const n = counts[countKey] || 0;
+				const ratio = n / max;
+				const hue = 240 - 240 * ratio;
+				el.style.backgroundColor = n ? `hsl(${hue}, 100%, 70%)` : "#eee";
+				el.title = `${displayKey}: ${n} (${((n/total)*100 || 0).toFixed(1)}%)`;
+			});
+		}
+
+		document.getElementById("fileInput").addEventListener("change", e => {
+			const file = e.target.files[0];
+			if (!file) return;
+			const reader = new FileReader();
+			reader.onload = ev => {
+				try {
+					customMap = JSON.parse(ev.target.result);
+					// カスタムキーボードレイアウトを作成
+					const customRows = qwertyRows.map(row => 
+						row.map(key => {
+							const upper = key.toUpperCase();
+							return customMap[upper] ? customMap[upper].toUpperCase() : key;
+						})
+					);
+					
+					// カスタム配列の有効キーセットを作成
+					customValidKeys.clear();
+					customRows.forEach(row => {
+						row.forEach(key => {
+							customValidKeys.add(key.toUpperCase());
+							customValidKeys.add(key.toLowerCase());
+						});
+					});
+					
+					createKeyboardLayout(customRows, "custom-keys");
+					alert("独自配列を読み込みました!");
+				} catch {
+					alert("JSONの形式が正しくありません。");
+				}
+			};
+			reader.readAsText(file);
+		});
+
+		document.getElementById("analyze").addEventListener("click", () => {
+			const text = document.getElementById("inputText").value;
+			const qwertyResult = countFrequency(text, false);
+			applyHeatmap("qwerty-keys", qwertyResult.counts, false);
+			
+			let infoText = `総文字数: ${text.length}, カウント対象: ${Object.values(qwertyResult.counts).reduce((a,b)=>a+b,0)}, 無視: ${qwertyResult.ignoredCount}, ユニークキー数: ${Object.keys(qwertyResult.counts).length}`;
+			
+			if (customMap) {
+				const customResult = countFrequency(text, true);
+				applyHeatmap("custom-keys", customResult.counts, true);
+			}
+			
+			document.getElementById("info").textContent = infoText;
+		});
+
+		createKeyboardLayout(qwertyRows, "qwerty-keys");
+		createKeyboardLayout(qwertyRows, "custom-keys");
+	</script>
+</body>
+</html>

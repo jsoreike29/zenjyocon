@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Keyboard Layout Optimizer</title>
+<style>
+	body { font-family: sans-serif; margin: 20px; background: #f7f7f7; }
+	textarea { width: 100%; height: 150px; padding: 8px; font-size: 14px; }
+	button { margin: 5px; padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; background: #4CAF50; color: white; }
+	button:hover { background: #45a049; }
+	button:disabled { background: #ccc; cursor: not-allowed; }
+	#keyboard { 
+		display: inline-block;
+		margin-top: 20px; 
+		background: #fff;
+		padding: 20px;
+		border-radius: 8px;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+	}
+	.key-row { display: flex; gap: 5px; margin-bottom: 5px; }
+	.key { 
+		background: white; 
+		text-align: center; 
+		padding: 12px 8px; 
+		border-radius: 4px; 
+		box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+		min-width: 40px;
+		font-weight: bold;
+		border: 2px solid #ddd;
+	}
+	.key.space { min-width: 240px; }
+	.key-original { font-size: 10px; color: #666; display: block; }
+	#result { 
+		background: white; 
+		padding: 15px; 
+		border-radius: 8px; 
+		box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+		margin-top: 15px;
+	}
+</style>
+</head>
+<body>
+<h2>キーボード配列焼きなまし最適化ツール</h2>
+<p>テキストを入力して「前計算」→「焼きなまし開始」を押してください。</p>
+<textarea id="inputText" placeholder="ここにサンプルテキストを入力（例：日本語をローマ字入力で打つ場合の英字シーケンス）"></textarea><br>
+
+<div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+	<strong>スコア重み設定：</strong><br>
+	<label>距離ペナルティ (d): <input type="number" id="weightD" value="1" min="0" step="0.1" style="width: 80px;"></label>
+	<label style="margin-left: 15px;">同一指連打 (h): <input type="number" id="weightH" value="2" min="0" step="0.1" style="width: 80px;"></label>
+	<label style="margin-left: 15px;">同一手連続 (f): <input type="number" id="weightF" value="1" min="0" step="0.1" style="width: 80px;"></label>
+</div>
+
+<button id="precalc">前計算</button>
+<button id="start">焼きなまし開始</button>
+<button id="reset">リセット</button>
+<button id="exportJson">結果をJSON出力</button>
+<pre id="result">待機中...</pre>
+<div id="keyboard"></div>
+<div id="jsonOutput" style="background: white; padding: 15px; border-radius: 8px; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: none;">
+	<strong>JSON出力（QWERTY配列からの変更）:</strong>
+	<pre id="jsonContent" style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;"></pre>
+</div>
+
+<script>
+const keyPositions = {
+	"Q": [1,1], "W": [2,1], "E": [3,1], "R": [4,1], "T": [5,1], "Y": [6,1], "U": [7,1], "I": [8,1], "O": [9,1], "P": [10,1], "[": [11,1], "]": [12,1], "\\": [13,1],
+	"A": [1,2], "S": [2,2], "D": [3,2], "F": [4,2], "G": [5,2], "H": [6,2], "J": [7,2], "K": [8,2], "L": [9,2], ";": [10,2], "'": [11,2],
+	"Z": [1,3], "X": [2,3], "C": [3,3], "V": [4,3], "B": [5,3], "N": [6,3], "M": [7,3], ",": [8,3], ".": [9,3], "/": [10,3],
+	" ": [6,4]
+};
+
+// ホームポジション（物理キー位置）
+const homePositions = {
+	"left_pinky": [1,2],    // A
+	"left_ring": [2,2],     // S
+	"left_middle": [3,2],   // D
+	"left_index": [4,2],    // F
+	"right_index": [7,2],   // J
+	"right_middle": [8,2],  // K
+	"right_ring": [9,2],    // L
+	"right_pinky": [10,2]   // ;
+};
+
+const keyRows = [
+	["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "[", "]", "\\"],
+	["A", "S", "D", "F", "G", "H", "J", "K", "L", ";", "'"],
+	["Z", "X", "C", "V", "B", "N", "M", ",", ".", "/"],
+	[" "]
+];
+
+let layout = {};
+let originalLayout = {};
+
+// 初期化
+function initLayout() {
+	Object.keys(keyPositions).forEach(k => {
+		layout[k] = k;
+		originalLayout[k] = k;
+	});
+}
+initLayout();
+
+// ユークリッド距離
+function euclideanDistance(pos1, pos2) {
+	const [x1, y1] = pos1;
+	const [x2, y2] = pos2;
+	return Math.sqrt((x1-x2)**2 + (y1-y2)**2);
+}
+
+// 各物理キーに対して最も近い指と距離を事前計算
+const keyToClosestFinger = {};
+Object.keys(keyPositions).forEach(key => {
+	if (key === " ") {
+		keyToClosestFinger[key] = {finger: "thumb", hand: "both", distance: 2};
+		return;
+	}
+	
+	const keyPos = keyPositions[key];
+	let minDist = Infinity;
+	let closestFinger = null;
+	let hand = null;
+	
+	Object.entries(homePositions).forEach(([fingerName, homePos]) => {
+		const dist = euclideanDistance(keyPos, homePos);
+		if (dist < minDist) {
+			minDist = dist;
+			closestFinger = fingerName;
+			hand = fingerName.startsWith("left") ? "left" : "right";
+		}
+	});
+	
+	keyToClosestFinger[key] = {
+		finger: closestFinger,
+		hand: hand,
+		distance: minDist * 2 // 往復距離
+	};
+});
+
+function preprocess(text) {
+	return text.toUpperCase().split("").filter(c => keyPositions.hasOwnProperty(c));
+}
+
+function calcScore(keys, layout, d=1, h=2, f=1) {
+	let D = 0;  // 距離ペナルティ
+	let H = 0;  // 同一指連打
+	let F = 0;  // 同一手連続
+	
+	let prevFinger = null;
+	let prevHand = null;
+	
+	for (let i = 0; i < keys.length; i++) {
+		const char = keys[i];
+		
+		// この文字が割り当てられている物理キーを見つける
+		const physicalKey = Object.keys(layout).find(k => layout[k] === char);
+		
+		if (!physicalKey || !keyToClosestFinger[physicalKey]) continue;
+		
+		const info = keyToClosestFinger[physicalKey];
+		
+		// 距離ペナルティ（毎回ホームポジションから往復）
+		D += info.distance;
+		
+		// 同一指連打ペナルティ
+		if (i > 0 && prevFinger === info.finger && info.finger !== "thumb") {
+			H++;
+		}
+		
+		// 同一手連続ペナルティ
+		if (i > 0 && prevHand === info.hand && info.hand !== "both") {
+			F++;
+		}
+		
+		prevFinger = info.finger;
+		prevHand = info.hand;
+	}
+	
+	return D * d + H * h + F * f;
+}
+
+function swapRandom(layout) {
+	const keys = Object.keys(layout).filter(k => k !== " "); // スペースは固定
+	const a = keys[Math.floor(Math.random()*keys.length)];
+	const b = keys[Math.floor(Math.random()*keys.length)];
+	const newLayout = {...layout};
+	[newLayout[a], newLayout[b]] = [newLayout[b], newLayout[a]];
+	return newLayout;
+}
+
+async function anneal(keys, layout, iterations=5000, T0=100, cooling=0.995, d=1, h=2, f=1){
+	let best = {...layout};
+	let bestScore = calcScore(keys, best, d, h, f);
+	let current = {...layout};
+	let currentScore = bestScore;
+	
+	for(let i=0; i<iterations; i++){
+		const newLayout = swapRandom(current);
+		const newScore = calcScore(keys, newLayout, d, h, f);
+		const T = T0 * Math.pow(cooling, i);
+		
+		if(newScore < currentScore || Math.random() < Math.exp((currentScore - newScore) / T)){
+			current = newLayout;
+			currentScore = newScore;
+			if(newScore < bestScore){ 
+				best = newLayout; 
+				bestScore = newScore;
+			}
+		}
+		
+		if(i % 100 === 0){
+			result.textContent = `進行中: ${i}/${iterations}\n現在のベストスコア: ${bestScore.toFixed(2)}\n温度: ${T.toFixed(2)}`;
+			await new Promise(r => setTimeout(r, 1));
+		}
+	}
+	return {layout: best, score: bestScore};
+}
+
+function showLayout() {
+	keyboard.innerHTML = "";
+	keyRows.forEach(row => {
+		const rowDiv = document.createElement("div");
+		rowDiv.className = "key-row";
+		row.forEach(originalKey => {
+			const div = document.createElement("div");
+			div.className = originalKey === " " ? "key space" : "key";
+			const assignedChar = layout[originalKey];
+			div.innerHTML = `${assignedChar}<span class="key-original">${originalKey}</span>`;
+			rowDiv.appendChild(div);
+		});
+		keyboard.appendChild(rowDiv);
+	});
+}
+
+document.getElementById("precalc").onclick = () => {
+	const text = document.getElementById("inputText").value;
+	if (!text.trim()) {
+		alert("テキストを入力してください");
+		return;
+	}
+	window.precomputed = preprocess(text);
+	const d = parseFloat(document.getElementById("weightD").value);
+	const h = parseFloat(document.getElementById("weightH").value);
+	const f = parseFloat(document.getElementById("weightF").value);
+	const initialScore = calcScore(window.precomputed, layout, d, h, f);
+	result.textContent = `前計算完了\n打鍵数: ${window.precomputed.length}\n初期スコア: ${initialScore.toFixed(2)}\n重み設定: d=${d}, h=${h}, f=${f}`;
+	showLayout();
+};
+
+document.getElementById("start").onclick = async () => {
+	if(!window.precomputed || window.precomputed.length === 0) {
+		alert("先に前計算をしてください。");
+		return;
+	}
+	
+	const d = parseFloat(document.getElementById("weightD").value);
+	const h = parseFloat(document.getElementById("weightH").value);
+	const f = parseFloat(document.getElementById("weightF").value);
+	
+	const startBtn = document.getElementById("start");
+	startBtn.disabled = true;
+	startBtn.textContent = "最適化中...";
+	
+	const result_obj = await anneal(window.precomputed, layout, 5000, 100, 0.995, d, h, f);
+	layout = result_obj.layout;
+	
+	const improvement = ((calcScore(window.precomputed, originalLayout, d, h, f) - result_obj.score) / calcScore(window.precomputed, originalLayout, d, h, f) * 100).toFixed(1);
+	
+	result.textContent = `最適化完了！\n最終スコア: ${result_obj.score.toFixed(2)}\n改善率: ${improvement}%\n重み設定: d=${d}, h=${h}, f=${f}`;
+	
+	showLayout();
+	startBtn.disabled = false;
+	startBtn.textContent = "焼きなまし開始";
+};
+
+document.getElementById("reset").onclick = () => {
+	initLayout();
+	window.precomputed = null;
+	result.textContent = "待機中...";
+	keyboard.innerHTML = "";
+	document.getElementById("jsonOutput").style.display = "none";
+};
+
+document.getElementById("exportJson").onclick = () => {
+	const changes = {};
+	Object.keys(layout).forEach(physicalKey => {
+		const assignedChar = layout[physicalKey];
+		// QWERTY配列から変更があった場合のみ記録
+		if (assignedChar !== originalLayout[physicalKey]) {
+			changes[physicalKey] = assignedChar;
+		}
+	});
+	
+	const jsonOutput = document.getElementById("jsonOutput");
+	const jsonContent = document.getElementById("jsonContent");
+	
+	if (Object.keys(changes).length === 0) {
+		jsonContent.textContent = "変更なし（QWERTY配列と同じ）";
+	} else {
+		jsonContent.textContent = JSON.stringify(changes, null, 2);
+	}
+	
+	jsonOutput.style.display = "block";
+};
+
+// 初期表示
+showLayout();
+</script>
+</body>
+</html>
