@@ -1,4 +1,4 @@
-# キーボード配列最適化・可視化ツール (Keyboard Layout Optimizer & Visualizer)
+# 1.キーボード配列最適化・可視化ツール (Keyboard Layout Optimizer & Visualizer)
 
 ユーザーの入力テキストデータを元に「指の移動距離」や「疲労」を最小化するキーボード配列を自動生成し、その配列の打鍵頻度をヒートマップで可視化・比較するためのHTMLツールセットです。
 
